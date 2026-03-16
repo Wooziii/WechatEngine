@@ -1,127 +1,173 @@
-# WeChat 4.x Database Decryptor
+# WechatEngine
 
-微信 4.0 (Windows、MacOS、Linux) 本地数据库解密工具。从运行中的微信进程内存提取加密密钥，解密所有 SQLCipher 4 加密数据库，并提供实时消息监听。
+<p align="center">
+  <img src="./WechatEngine.png" alt="WechatEngine logo" width="160">
+</p>
 
-## 更新日志
+<p align="center">面向 Windows WeChat 4.0 的本地数据库解密、实时监控、历史检索、群聊分析与 AI 助手工具箱。</p>
 
-### 2025-03-03 — 富媒体内容 & 组合消息修复
+WechatEngine 聚焦一件事：把你自己的微信本地数据变成可查询、可分析、可监控的工作台。
 
-- **表情包内联显示**: 自动从 emoticon.db 构建 MD5→CDN 映射，支持自定义表情（NonStore）和商店表情（Store），CDN 下载后本地缓存
-- **富媒体内容解析**: 链接卡片（type 49）、文件、视频号、小程序、引用回复、位置分享等在 Web UI 中完整渲染
-- **文字+图片组合消息不再丢失**: 修复同时发送文字和图片时只显示最后一条的问题（前端去重 key 增加消息类型）
-- **隐藏消息检测**: 新增 `_check_hidden_messages` 机制，session.db 只保存最后一条消息摘要，现在会异步查 message DB 找回同一秒内的其他消息
-- **MonitorDBCache 线程安全**: 引入 per-key 锁，防止多线程并发解密同一数据库导致文件损坏
-- **Web UI 改进**: 消息气泡样式优化、群聊发送者显示、图片缩略图点击放大
+它既能从运行中的微信进程提取 SQLCipher 4 密钥并解密数据库，也能提供实时消息监控、聊天历史检索、群聊分析看板、桌面壳界面，以及给 Claude Code 使用的 MCP Server。
 
-## 原理
+## Fork 说明
 
-微信 4.0 使用 SQLCipher 4 加密本地数据库：
-- **加密算法**: AES-256-CBC + HMAC-SHA512
-- **KDF**: PBKDF2-HMAC-SHA512, 256,000 iterations
-- **页面大小**: 4096 bytes, reserve = 80 (IV 16 + HMAC 64)
-- **每个数据库有独立的 salt 和 enc_key**
+本仓库以 GitHub fork 的方式维护，来源于上游项目 [ylytdeng/wechat-decrypt](https://github.com/ylytdeng/wechat-decrypt)。
 
-WCDB (微信的 SQLCipher 封装) 会在进程内存中缓存派生后的 raw key，格式为 `x'<64hex_enc_key><32hex_salt>'`。三个平台（Windows / Linux / macOS）均可通过扫描进程内存匹配此模式，再通过 HMAC 校验 page 1 确认密钥正确性。
+这样做的目的，是保留原始提交历史、作者署名和上游关系，同时在此基础上继续维护更偏日常使用的一组增强能力，例如：
 
-## 使用方法
+- 桌面壳与托盘运行体验
+- 更完整的实时监控与历史查看界面
+- 群聊分析页与 AI 洞察能力
+- 一些围绕性能、缓存、交互细节的持续优化
+
+如果你想了解原始解密思路和更早的项目背景，建议同时查看上游仓库。
+
+## 功能概览
+
+- 提取运行中微信进程里的数据库密钥，并解密本地 SQLCipher 4 数据库
+- 提供实时消息监控页，支持最近会话、会话切换、历史回看、关键词检索
+- 提供群聊分析页，查看活跃度、成员画像、话题走向、趣味洞察和 AI 分析结果
+- 提供 AI 侧栏，可调用本机 `claude` 命令或兼容 OpenAI / Anthropic 的接口
+- 提供桌面壳程序，支持托盘驻留、最小化隐藏、打包发布
+- 提供 MCP Server，让 Claude Code 直接查询最近会话、历史消息、联系人和新消息
+
+## 软件能做什么
+
+### 1. 本地数据库解密
+
+微信 4.0 使用 SQLCipher 4 加密本地数据库。WechatEngine 会扫描运行中的微信进程内存，定位派生后的 raw key，匹配数据库 salt 后完成验证和解密。
+
+- 加密算法：AES-256-CBC + HMAC-SHA512
+- KDF：PBKDF2-HMAC-SHA512，256000 次
+- 页面大小：4096 bytes
+- 每个数据库都有独立的 salt 和 enc_key
+
+### 2. 实时消息监控
+
+`monitor_web.py` 会监听数据库和 WAL 变化，并通过 Web UI 把最新消息推到界面上。
+
+- 最近会话列表
+- 单会话历史浏览
+- 关键词搜索与时间范围过滤
+- 实时提醒
+- AI 侧栏问答
+- Markdown 导出
+
+### 3. 群聊数据分析
+
+`analysis_web.html` 提供更偏洞察和运营视角的分析页面。
+
+- 活跃度与消息量概览
+- 话题和关键词趋势
+- 成员画像与行为风格
+- 互动线索和高光时刻
+- AI 生成的结构化洞察、情绪判断和建议动作
+
+### 4. 桌面版壳层
+
+`desktop_shell.py` 会把 Web UI 包进桌面窗口里，并提供更接近日常软件的体验。
+
+- 托盘常驻
+- 最小化隐藏
+- 重启本地服务
+- 开机启动开关
+- 一键打包桌面发布包
+
+### 5. Claude Code / MCP 集成
+
+你可以把 WechatEngine 暴露成 MCP Server，让 Claude Code 直接查你的本地微信数据。
+
+- `get_recent_sessions(limit)`
+- `get_chat_history(chat_name, limit)`
+- `search_messages(keyword, limit)`
+- `get_contacts(query, limit)`
+- `get_new_messages()`
+
+更多示例见 [USAGE.md](USAGE.md)。
+
+## 快速开始
 
 ### 环境要求
 
-- Python 3.10+
-- 微信 4.x
-- `pip install -r requirements.txt`
-
-Windows：
-
 - Windows 10/11
-- 微信正在运行
-- 需要管理员权限（读取进程内存）
-
-Linux：
-
-- 64-bit Linux
-- 需要 root 权限或 `CAP_SYS_PTRACE`（读取 `/proc/<pid>/mem`）
-- `db_dir` 默认类似 `~/Documents/xwechat_files/<wxid>/db_storage`
+- Python 3.10+
+- 正在运行的微信 4.0
+- 管理员权限
 
 ### 安装依赖
 
 ```bash
-pip install -r requirements.txt
+pip install pycryptodome
 ```
 
-Windows 如果遇到权限不足或全局环境不可写，可以改用：
+如果你要使用 MCP：
 
 ```bash
-py -m pip install --user -r requirements.txt
+pip install mcp
 ```
 
-如果需要读取受保护的进程或把依赖安装到系统 Python，也可能需要以管理员身份打开终端。
+### 1. 配置
 
-### 快速开始
-
-Windows：
+复制模板并编辑：
 
 ```bash
-python main.py
-python main.py decrypt
+copy config.example.json config.json
 ```
 
-Linux：
-
-```bash
-python3 main.py decrypt
-```
-
-程序会自动完成：配置检测 → 内存扫描提取密钥 → 解密。首次运行会自动检测微信数据目录并生成 `config.json`。微信只要在运行中即可，无需重启或重新登录。
-
-如果自动检测失败（例如微信安装在非默认位置），手动创建 `config.json`：
-```json
-{
-    "db_dir": "D:\\xwechat_files\\你的微信ID\\db_storage",
-    "keys_file": "all_keys.json",
-    "decrypted_dir": "decrypted",
-    "wechat_process": "Weixin.exe"
-}
-```
-
-Linux 版 `config.json` 示例：
+`config.json` 示例：
 
 ```json
 {
-    "db_dir": "/home/yourname/Documents/xwechat_files/your_wxid/db_storage",
-    "keys_file": "all_keys.json",
-    "decrypted_dir": "decrypted",
-    "wechat_process": "wechat"
+  "db_dir": "D:\\xwechat_files\\your_wxid\\db_storage",
+  "keys_file": "all_keys.json",
+  "decrypted_dir": "decrypted",
+  "wechat_process": "Weixin.exe",
+  "web_port": 8080
 }
 ```
 
-`db_dir` 路径：Windows 可在微信设置 → 文件管理中找到；Linux 默认在 `~/Documents/xwechat_files/<wxid>/db_storage`。
+`db_dir` 可以在微信设置的文件管理路径里找到。
 
-### Web UI 说明
-
-`python main.py` 启动后打开 http://localhost:5678 查看实时消息流。
-
-- 30ms 轮询 WAL 文件变化 (mtime)
-- 检测到变化后全量解密 + WAL patch (~70ms)
-- SSE 实时推送到浏览器
-- 总延迟约 100ms
-- **图片消息内联预览**（支持旧 XOR / V1 / V2 三种 .dat 加密格式）
-
-### MCP Server (Claude AI 集成)
-
-将微信数据查询能力接入 [Claude Code](https://claude.ai/claude-code)，让 AI 直接读取你的微信消息。
+### 2. 提取密钥
 
 ```bash
-pip install -r requirements.txt
+python find_all_keys.py
 ```
 
-注册到 Claude Code：
+### 3. 解密数据库
 
 ```bash
-claude mcp add wechat -- python C:\Users\你的用户名\wechat-decrypt\mcp_server.py
+python decrypt_db.py
 ```
 
-或手动编辑 `~/.claude.json`：
+### 4. 打开实时监控页
+
+```bash
+python monitor_web.py
+```
+
+程序会在本地启动服务，并输出实际访问地址。
+
+### 5. 打开桌面壳
+
+```bash
+python desktop_shell.py
+```
+
+### 6. 打包桌面版
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build_desktop_release.ps1
+```
+
+## MCP 注册示例
+
+```bash
+claude mcp add wechat -- python C:\path\to\WechatEngine\mcp_server.py
+```
+
+或者在 `~/.claude.json` 里手动配置：
 
 ```json
 {
@@ -129,125 +175,58 @@ claude mcp add wechat -- python C:\Users\你的用户名\wechat-decrypt\mcp_serv
     "wechat": {
       "type": "stdio",
       "command": "python",
-      "args": ["C:\\Users\\你的用户名\\wechat-decrypt\\mcp_server.py"]
+      "args": ["C:\\path\\to\\WechatEngine\\mcp_server.py"]
     }
   }
 }
 ```
 
-注册后在 Claude Code 中即可使用以下工具：
-
-| Tool | 功能 |
-|------|------|
-| `get_recent_sessions(limit)` | 最近会话列表（含消息摘要、未读数） |
-| `get_chat_history(chat_name, limit, offset, start_time, end_time)` | 指定聊天的消息记录，支持时间范围和分页 |
-| `search_messages(keyword, chat_name, start_time, end_time, limit, offset)` | 统一搜索消息；支持全库、单个聊天对象、多个聊天对象、时间范围和分页 |
-| `get_contacts(query, limit)` | 搜索/列出联系人 |
-| `get_new_messages()` | 获取自上次调用以来的新消息 |
-
-前置条件：需要先运行 `python main.py` 或 `python find_all_keys.py` 完成密钥提取。
-
-说明：`search_messages` 的 `limit` 最大为 `500`；`get_chat_history` 支持更大的 `limit`，但消息很多时仍建议配合 `offset` 分页读取。
-
-**[查看使用案例 →](USAGE.md)**
-
-### 图片解密 (V2 格式)
-
-微信 4.0 (2025-08+) 的 .dat 图片文件使用 AES-128-ECB + XOR 混合加密 (V2 格式)。AES 密钥需要从运行中的微信进程内存中提取：
-
-```bash
-# 1. 在微信中打开查看 2-3 张图片（点击看大图）
-# 2. 立即运行密钥提取（持续监控版）：
-python find_image_key_monitor.py
-
-# 或单次扫描版：
-python find_image_key.py
-```
-
-密钥会自动保存到 `config.json` 的 `image_aes_key` 字段。之后 `monitor_web.py` 启动时会自动加载密钥，图片消息将显示内联预览。
-
-> **注意**: AES 密钥仅在微信查看图片时临时加载到内存中。如果扫描未找到密钥，请先在微信中查看几张图片，然后立即重新运行脚本。
-
-## 文件说明
+## 目录说明
 
 | 文件 | 说明 |
 |------|------|
-| `main.py` | **一键启动入口** — 自动配置、提取密钥、启动服务 |
-| `config.py` | 配置加载器（自动检测微信数据目录） |
-| `find_all_keys.py` | 平台分发入口（Windows / Linux） |
-| `find_all_keys_windows.py` | Windows 版内存扫描提 key |
-| `find_all_keys_linux.py` | Linux 版内存扫描提 key |
-| `decrypt_db.py` | 全量解密所有数据库 |
-| `mcp_server.py` | MCP Server，让 Claude AI 查询微信数据 |
-| `monitor_web.py` | 实时消息监听 (Web UI + SSE + 图片预览) |
-| `monitor.py` | 实时消息监听 (命令行) |
-| `decode_image.py` | 图片 .dat 文件解密模块 (XOR / V1 / V2) |
-| `find_image_key.py` | 从微信进程内存提取图片 AES 密钥 |
-| `find_image_key_monitor.py` | 持续监控版密钥提取（推荐） |
-| `latency_test.py` | 延迟测量诊断工具 |
-| `find_all_keys_macos.c` | macOS 版内存密钥扫描器 (C, Mach VM API) |
+| `find_all_keys.py` | 从微信进程内存提取数据库密钥 |
+| `decrypt_db.py` | 解密数据库 |
+| `monitor_web.py` | Web 服务入口，提供实时监控、历史查询、分析接口 |
+| `monitor_web.html` | 监控页前端 |
+| `analysis_web.html` | 分析页前端 |
+| `desktop_shell.py` | 桌面壳程序 |
+| `mcp_server.py` | MCP Server |
+| `build_desktop_release.ps1` | 桌面版打包脚本 |
+| `tests/` | 回归测试 |
 
-## 技术细节
+## 隐私与安全
 
-### WAL 处理
+仓库默认不提交本地隐私数据。当前已忽略：
 
-微信使用 SQLite WAL 模式，WAL 文件是**预分配固定大小** (4MB)。检测变化时：
-- 不能用文件大小 (永远不变)
-- 使用 mtime 检测写入
-- 解密 WAL frame 时需校验 salt 值，跳过旧周期遗留的 frame
+- `config.json`
+- `all_keys.json`
+- `decrypted/`
+- 各类 `.db` / `.db-wal` / `.db-shm`
+- `_archive/`、`artifacts/`、`release_desktop/`
 
-### 图片 .dat 加密格式
+也就是说，开源仓库里保留的是工具代码，不包含你的微信数据库、提取出的密钥或本地运行产物。
 
-微信本地图片 (.dat) 有三种加密格式：
+## 致谢与贡献者
 
-| 格式 | 时期 | Magic | 加密方式 | 密钥来源 |
-|------|------|-------|---------|---------|
-| 旧 XOR | ~2025-07 | 无 | 单字节 XOR | 自动检测 (对比 magic bytes) |
-| V1 | 过渡期 | `07 08 V1 08 07` | AES-ECB + XOR | 固定 key: `cfcd208495d565ef` |
-| V2 | 2025-08+ | `07 08 V2 08 07` | AES-128-ECB + XOR | 从进程内存提取 |
+本仓库保留了 fork 关系和上游提交历史，GitHub 页面顶部可以直接追溯上游来源。
 
-V2 文件结构: `[6B signature] [4B aes_size LE] [4B xor_size LE] [1B padding]` + `[AES-ECB encrypted] [raw unencrypted] [XOR encrypted]`
+另外，我也把公开可见的上游贡献者整理在了 [CONTRIBUTORS.md](CONTRIBUTORS.md)，方便在 README 外单独查看。
 
-### 数据库结构
+上游项目参考：
 
-解密后包含约 26 个数据库：
-- `session/session.db` - 会话列表 (最新消息摘要)
-- `message/message_*.db` - 聊天记录
-- `contact/contact.db` - 联系人
-- `media_*/media_*.db` - 媒体文件索引
-- 其他: head_image, favorite, sns, emoticon 等
+- [ylytdeng/wechat-decrypt](https://github.com/ylytdeng/wechat-decrypt)
 
-## macOS 数据库密钥扫描 (WeChat 4.x)
+## README 图片说明
 
-macOS 版微信 4.x 使用 SQLCipher 4 加密本地数据库，密钥格式为 `x'<64hex_key><32hex_salt>'`。C 版扫描器通过 Mach VM API 扫描微信进程内存提取密钥。
+可以，GitHub README 支持 PNG、JPG、GIF、WebP，也支持仓库内相对路径图片。页首 Logo 就是一个实际例子。
 
-### 前置条件
+后续如果你想加界面截图，建议放到 `docs/images/`，然后这样引用：
 
-- macOS (Apple Silicon / Intel)
-- WeChat 4.x (macOS 版)
-- Xcode Command Line Tools: `xcode-select --install`
-- 微信需要 ad-hoc 签名（或安装了防撤回补丁）：
-  `sudo codesign --force --deep --sign - /Applications/WeChat.app`
-
-### 编译和使用
-
-```bash
-# 编译
-cc -O2 -o find_all_keys_macos find_all_keys_macos.c -framework Foundation
-
-# 运行（自动查找微信进程、扫描内存、匹配 DB salt）
-sudo ./find_all_keys_macos
-
-# 或指定 PID
-sudo ./find_all_keys_macos <pid>
-```
-
-输出 `all_keys.json`，格式兼容 `decrypt_db.py`，可直接用于解密：
-
-```bash
-python3 decrypt_db.py
+```md
+![监控页截图](docs/images/monitor.png)
 ```
 
 ## 免责声明
 
-本工具仅用于学习和研究目的，用于解密**自己的**微信数据。请遵守相关法律法规，不要用于未经授权的数据访问。
+本项目仅用于学习、研究和处理你自己的本地数据。请遵守适用法律法规，不要用于未经授权的数据访问或传播。

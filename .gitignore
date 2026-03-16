@@ -3,7 +3,6 @@ all_keys.json
 wechat_key.txt
 config.json
 decrypted/
-decoded_images/
 *.db
 *.db-shm
 *.db-wal
@@ -15,10 +14,50 @@ hook_start_output.txt
 hook_stderr.txt
 run_hook.bat
 
+# Runtime outputs and personal data
+logs/
+exports/
+*_profile.html
+*_profile.jpg
+*_report.html
+test_api.txt
+len
+repr*
+SKILL.md
+analyze_chat.py
+generate_long_image.py
+
 # Python
 __pycache__/
 *.py[cod]
 *.egg-info/
+
+# Build artifacts
+build/
+dist/
+release/
+release_*/
+release_desktop/
+artifacts/
+_archive/
+TopicEngine-desktop-*.zip
+WechatEngine-desktop*.zip
+release*.zip
+*.spec
+
+# Local tooling / agent state
+.codebuddy/
+.learnings/
+.playwright-cli/
+
+# Local diagnostics and scratch files
+.tmp*
+tmp_*
+.topicengine-*.log
+desktop_settings.json
+output/
+decoded_images/
+nul
 
 # OS
 .DS_Store

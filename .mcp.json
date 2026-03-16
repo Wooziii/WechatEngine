@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "wechat": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "mcp_server.py"
+      ],
+      "env": {}
+    }
+  }
+}
